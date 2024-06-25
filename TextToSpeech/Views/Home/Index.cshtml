@@ -1,0 +1,100 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+@model TextToSpeech.Models.SesSentezleme
+
+<h1>Metin Okuma Uygulaması</h1>
+<form asp-controller="Home" asp-action="Index" method="post">
+    <textarea id="MetinKutusu" name="Metin" rows="20" class="w-100" asp-for="Metin"></textarea><br />
+    <div class="m-3 p-3">
+        <select asp-for="Dil" class="form-select w-25">
+            @{
+                HashSet<string> dilSecenekleri = new HashSet<string>();
+                foreach (var item in SesSentezleme.SesSecenekleri().Result)
+                {
+                    if (!dilSecenekleri.Contains(item.Locale))
+                    {
+                        dilSecenekleri.Add(item.Locale);
+                            <option value="@item.Locale">@item.Locale</option>
+                    }
+                }
+            }
+        </select><br />
+        <select name="Konusmaci" asp-for="Konusmaci" id="Konusmaci" class="form-select w-25">
+        </select>
+    </div>
+    <button type="submit" class="btn btn-lg btn-dark w-50">Dinle</button><button id="durdurButton" type="button" class="btn btn-lg btn-danger w-50">Durdur</button>
+    <div class="dropdown w-100 mt-2">
+        <button class="btn btn-lg btn-success w-100 dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">Ses dosyasını indir</button>
+        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+            <li><a class="dropdown-item" id="mp3indir">MP3 dosyası olarak indir.</a></li>
+            <li><a class="dropdown-item" id="wavindir">Wave dosyası olarak indir.</a></li>
+        </ul>
+    </div>
+</form>
+
+<script>
+    function konusmaciDoldur() {
+        var seslendirmenDili = document.getElementById("Dil").value;
+        var konusmaciSelect = document.getElementById("Konusmaci");
+        konusmaciSelect.innerHTML = "";
+        var sesler = @Html.Raw(Json.Serialize(SesSentezleme.SesSecenekleri().Result));
+        sesler.forEach(function (sesler) {
+            if (sesler.locale === seslendirmenDili) {
+                var option = document.createElement("option");
+                option.value = sesler.shortName;
+                option.text = sesler.localName;
+                konusmaciSelect.appendChild(option);
+            }
+        });
+    }
+    function SesDosyasiKaydet(tur) {
+        var sesOzellikleri = {
+            Metin: document.getElementById("MetinKutusu").value,
+            Dil: document.getElementById("Dil").value,
+            Konusmaci: document.getElementById("Konusmaci").value
+        };
+        $.ajax({
+            url: '/Home/SesKaydet',
+            type: 'POST',
+            data: { sesSentezleme: sesOzellikleri, dosyaTuru: tur },
+            xhrFields: {
+                responseType: 'blob'
+            },
+            success: function (data) {
+                var url = window.URL.createObjectURL(new Blob([data]));
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'sesDosyasi.' + tur;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            },
+            error: function (xhr, status, error) {
+                alert("Hata oluştu: " + error);
+            }
+        });
+    }
+
+
+    document.getElementById("durdurButton").addEventListener("click", function () {
+        fetch('@Url.Action("Durdur", "Home")', {
+            method: 'POST'
+        })
+    });
+    document.getElementById("Dil").addEventListener("change", konusmaciDoldur);
+    document.getElementById("mp3indir").addEventListener("click", function () {
+        SesDosyasiKaydet("mp3");
+    });
+    document.getElementById("wavindir").addEventListener("click", function () {
+        SesDosyasiKaydet("wav");
+    });
+
+
+    konusmaciDoldur();
+    var konusmaci = "@Model.Konusmaci";
+    if (konusmaci !== null && konusmaci !== "") {
+        document.getElementById("Konusmaci").value = konusmaci;
+    }
+   
+</script>
